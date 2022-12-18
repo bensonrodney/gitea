@@ -911,6 +911,12 @@ func SignInOAuthCallback(ctx *context.Context) {
 			ctx.Redirect(setting.AppSubURL + "/user/login")
 			return
 		}
+		if u == nil {
+			// if we have a gothUser but no local user, deny access
+			ctx.Flash.Error(ctx.Tr("auth.oauth.signin.error.access_denied"))
+			ctx.Redirect(setting.AppSubURL + "/user/login")
+			return
+		}
 		ctx.ServerError("UserSignIn", err)
 		return
 	}
@@ -1216,6 +1222,15 @@ func oAuth2UserLoginCallback(authSource *auth.Source, request *http.Request, res
 				return nil, goth.User{}, user_model.ErrUserProhibitLogin{Name: gothUser.UserID}
 			}
 		}
+	}
+
+	email_user, err := user_model.GetUserByEmail(gothUser.Email)
+	if err != nil {
+		return nil, goth.User{}, err
+	}
+
+	if email_user != nil {
+		return email_user, gothUser, nil
 	}
 
 	user := &user_model.User{
